@@ -1,0 +1,39 @@
+name: Python CD
+on:
+  push:
+    branches: [main]
+jobs:
+  deploy-canary:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+    - name: Deploy to Canary
+      uses: akhileshns/heroku-deploy@v3.12.12
+      with:
+        heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
+        heroku_app_name: "my-python-ci-app-canary"
+        heroku_email: ${{ secrets.HEROKU_EMAIL }}
+        healthcheck: "https://my-python-ci-app-canary.herokuapp.com/hello"
+        checkstring: "Hello World"
+        delay: 10
+    - name: Wait for manual approval
+      uses: trstringer/manual-approval@v1
+      id: wait-for-approval
+      with:
+        secret: ${{ github.token }}
+        approvers: ${{ github.actor }}
+        minimum-approvals: 1
+    - name: Deploy to Production
+      if: steps.wait-for-approval.outputs.approved == 'true'
+      uses: akhileshns/heroku-deploy@v3.12.12
+      with:
+        heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
+        heroku_app_name: "my-python-ci-app"
+        heroku_email: ${{ secrets.HEROKU_EMAIL }}
